@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two Player Top-Down Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        h1 {
+            position: absolute;
+            top: 20px;
+            color: #FFF;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-size: 2rem;
+        }
+        canvas {
+            background-color: #2d3748; /* Darker canvas for contrast */
+            border: 2px solid #4A5568; /* Border for better visibility */
+            border-radius: 8px; /* Rounded corners */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Shadow for depth */
+        }
+    </style>
+</head>
+<body>
+    <h1>Two Player Top-Down Game</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const players = [];
+        let playerIndex = null;
+
+        const socket = new WebSocket("ws://localhost:8080/ws");
+
+        socket.onopen = () => {
+            console.log("WebSocket connection opened");
+        };
+
+        socket.onmessage = (event) => {
+            const message = event.data.split(" ");
+            switch (message[0]) {
+                case "Init":
+                    const numPlayers = parseInt(message[1]);
+                    playerIndex = parseInt(message[2]);
+                    for (let i = 0; i < numPlayers; i++) {
+                        players[i] = {
+                            x: Math.random() * (canvas.width - 25),
+                            y: Math.random() * (canvas.height - 25),
+                            width: 25,
+                            height: 25,
+                            color: i === playerIndex ? '#00ffff' : `hsl(${Math.random() * 360}, 100%, 50%)`, // Different color for each player
+                        };
+                    }
+                    break;
+                case "New":
+                    const newPlayerId = parseInt(message[message.length - 1]);
+                    players[newPlayerId] = {
+                        x: Math.random() * (canvas.width - 25),
+                        y: Math.random() * (canvas.height - 25),
+                        width: 25,
+                        height: 25,
+                        color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                    };
+                    break;
+                case "pos":
+                    const idx = parseInt(message[1]);
+                    const posX = parseInt(message[2]);
+                    const posY = parseInt(message[3]);
+                    if (players[idx]) {
+                        players[idx].x = posX;
+                        players[idx].y = posY;
+                    }
+                    break;
+                case "Player":
+                    if (message[1] === "left:") {
+                        const leftPlayerId = parseInt(message[2]);
+                        delete players[leftPlayerId];
+                    }
+                    break;
+            }
+        };
+
+        let lastPosUpdateTime = Date.now();
+
+        window.addEventListener('keydown', (e) => {
+            if (playerIndex === null) return; // Not connected yet
+
+            const speed = 5;
+            switch (e.key) {
+                case 'w':
+                    players[playerIndex].y -= speed;
+                    break;
+                case 's':
+                    players[playerIndex].y += speed;
+                    break;
+                case 'a':
+                    players[playerIndex].x -= speed;
+                    break;
+                case 'd':
+                    players[playerIndex].x += speed;
+                    break;
+            }
+
+            // Boundary checking
+            players[playerIndex].x = Math.max(0, Math.min(canvas.width - players[playerIndex].width, players[playerIndex].x));
+            players[playerIndex].y = Math.max(0, Math.min(canvas.height - players[playerIndex].height, players[playerIndex].y));
+        });
+
+        function update() {
+            const currentTime = Date.now();
+            if (playerIndex !== null && currentTime - lastPosUpdateTime >= 1000) {
+                const player = players[playerIndex];
+                socket.send(`pos ${playerIndex} ${Math.round(player.x)} ${Math.round(player.y)}`);
+                lastPosUpdateTime = currentTime;
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < players.length; i++) {
+                if (players[i]) {
+                    ctx.fillStyle = players[i].color;
+                    ctx.fillRect(players[i].x, players[i].y, players[i].width, players[i].height);
+                }
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>

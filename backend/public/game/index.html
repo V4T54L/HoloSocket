@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two Player Top-Down Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a202c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+
+        h1 {
+            position: absolute;
+            top: 20px;
+            color: #FFF;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-size: 2rem;
+        }
+
+        canvas {
+            background-color: #2d3748;
+            border: 2px solid #4A5568;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Two Player Top-Down Game</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const players = [];
+        let playerIndex = null;
+
+        // const socket = new WebSocket("ws://localhost:8080/ws");
+        const socket = new WebSocket("ws://192.168.1.4:8080/ws");
+
+        socket.onopen = () => {
+            console.log("WebSocket connection opened");
+        };
+
+        socket.onmessage = (event) => {
+            const message = event.data.split(" ");
+            switch (message[0]) {
+                case "Init":
+                    const numPlayers = parseInt(message[2]);
+                    playerIndex = parseInt(message[1]);
+                    for (let i = 0; i < numPlayers; i++) {
+                        players[i] = createPlayer(i);
+                    }
+                    break;
+                case "New":
+                    const newPlayerId = parseInt(message[message.length - 1]);
+                    players[newPlayerId] = createPlayer(newPlayerId);
+                    break;
+                case "pos":
+                    const idx = parseInt(message[1]);
+                    const posX = parseInt(message[2]);
+                    const posY = parseInt(message[3]);
+                    if (players[idx]) {
+                        // Smoothly move other players to their new positions
+                        players[idx].targetX = posX;
+                        players[idx].targetY = posY;
+                    }
+                    break;
+                case "Player":
+                    if (message[1] === "left:") {
+                        const leftPlayerId = parseInt(message[2]);
+                        delete players[leftPlayerId];
+                    }
+                    break;
+            }
+        };
+
+        function createPlayer(index) {
+            return {
+                x: 100 * index,
+                y: 100,
+                width: 25,
+                height: 25,
+                color: index === playerIndex ? '#00ffff' : `hsl(${Math.random() * 360}, 100%, 50%)`,
+                speed: 5,
+                targetX: Math.random() * (canvas.width - 25),
+                targetY: Math.random() * (canvas.height - 25),
+                smoothSpeed: 0.1,
+                direction: { x: 0, y: 0 }
+            };
+        }
+
+        const keys = {};
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        function handleMovement(player) {
+            player.direction.x = 0;
+            player.direction.y = 0;
+
+            if (keys['w']) player.direction.y -= 1; // Move up
+            if (keys['s']) player.direction.y += 1; // Move down
+            if (keys['a']) player.direction.x -= 1; // Move left
+            if (keys['d']) player.direction.x += 1; // Move right
+
+            // Ensure 8-directional movement
+            if (player.direction.x !== 0 || player.direction.y !== 0) {
+                const magnitude = Math.sqrt(player.direction.x ** 2 + player.direction.y ** 2);
+                player.direction.x /= magnitude;
+                player.direction.y /= magnitude;
+
+                player.x += player.direction.x * player.speed;
+                player.y += player.direction.y * player.speed;
+            }
+
+            // Boundary checking
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+        }
+
+        let lastPosUpdateTime = Date.now();
+
+        function update() {
+            if (playerIndex !== null) {
+                const player = players[playerIndex];
+                handleMovement(player);
+
+                const currentTime = Date.now();
+                if (currentTime - lastPosUpdateTime >= 30) {
+                    socket.send(`pos ${playerIndex} ${Math.round(player.x)} ${Math.round(player.y)}`);
+                    lastPosUpdateTime = currentTime;
+                }
+            }
+
+            // Smooth movement for other players
+            for (let player of players) {
+                if (player && player !== players[playerIndex]) {
+                    player.x += (player.targetX - player.x) * player.smoothSpeed;
+                    player.y += (player.targetY - player.y) * player.smoothSpeed;
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < players.length; i++) {
+                if (players[i]) {
+                    ctx.fillStyle = players[i].color;
+                    ctx.fillRect(players[i].x, players[i].y, players[i].width, players[i].height);
+                }
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+
+</html>

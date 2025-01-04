@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        h1 {
+            position: absolute;
+            top: 20px;
+            color: #FFF;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            font-size: 2rem;
+        }
+        canvas {
+            background-color: #2d3748; /* Darker canvas for contrast */
+            border: 2px solid #4A5568; /* Border for better visibility */
+            border-radius: 8px; /* Rounded corners */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5); /* Shadow for depth */
+        }
+    </style>
+</head>
+<body>
+    <h1>Top-Down Game</h1>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const player1 = {
+            x: 50,
+            y: 50,
+            width: 25,
+            height: 25,
+            color: '#00ffff',
+            speed: 5,
+            keys: {
+                up: 'w',
+                down: 's',
+                left: 'a',
+                right: 'd'
+            }
+        };
+
+        const player2 = {
+            x: 725,
+            y: 575,
+            width: 25,
+            height: 25,
+            color: '#ff00ff',
+            speed: 5,
+            keys: {
+                up: 'ArrowUp',
+                down: 'ArrowDown',
+                left: 'ArrowLeft',
+                right: 'ArrowRight'
+            }
+        };
+
+        const keys = {};
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        function update() {
+            // Player 1 Movement
+            if (keys[player1.keys.up]) player1.y -= player1.speed;
+            if (keys[player1.keys.down]) player1.y += player1.speed;
+            if (keys[player1.keys.left]) player1.x -= player1.speed;
+            if (keys[player1.keys.right]) player1.x += player1.speed;
+
+            // Player 2 Movement
+            if (keys[player2.keys.up]) player2.y -= player2.speed;
+            if (keys[player2.keys.down]) player2.y += player2.speed;
+            if (keys[player2.keys.left]) player2.x -= player2.speed;
+            if (keys[player2.keys.right]) player2.x += player2.speed;
+
+            // Boundary collision
+            player1.x = Math.max(0, Math.min(canvas.width - player1.width, player1.x));
+            player1.y = Math.max(0, Math.min(canvas.height - player1.height, player1.y));
+            player2.x = Math.max(0, Math.min(canvas.width - player2.width, player2.x));
+            player2.y = Math.max(0, Math.min(canvas.height - player2.height, player2.y));
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = player1.color;
+            ctx.fillRect(player1.x, player1.y, player1.width, player1.height);
+            ctx.fillStyle = player2.color;
+            ctx.fillRect(player2.x, player2.y, player2.width, player2.height);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
